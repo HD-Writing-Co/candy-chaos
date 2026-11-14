@@ -49,3 +49,12 @@ Open the deployed site in a browser tab, enter the same voice room on two accoun
 2. In Vercel, set `APP_URL`, `AUTH_FROM_EMAIL`, and `RESEND_API_KEY`. Verify your sender domain in Resend and keep click tracking disabled for verification emails so the link goes directly to your site. Remove the retired `CLUB_INVITE_CODE` variable.
 3. Commit the extracted project files and redeploy. Existing users sign in again with the same username and password. Their IDs, profiles, and rooms are preserved. Legacy accounts have no verified email. Password recovery, verification for legacy accounts, and payments are outside this release.
 4. On the deployed URL, do a test signup with a real inbox. Check delivery, complete signup, sign out, and sign in with the new credentials.
+
+## Upgrade to the categorized room directory and staff roles
+
+1. In Turso, open the existing `chaos-candy` database, choose **Edit Data**, and run the single SQL statement in `db/upgrade-club-roles.sql`. The same statement is included in the full schema for new installs. Keep your database and existing environment settings.
+2. In Vercel, set `CLUB_OWNER_EMAIL` for Production to the email used to verify your own **Chaos & Candy** account. Use the email you signed up with. This account is the owner and retains admin access. Complete signup and create a club profile if you have not already done so.
+3. Commit the updated files to your GitHub repo and deploy them to Vercel. Sign in as the owner, open **Members**, select a profile, and use **Club role → Save role**. Admins can assign Member, Moderator, or Admin. Moderators can enter staff rooms. Only admins can change roles. The owner is managed through Vercel.
+4. Check with a regular account and a moderator account. The **Mods** rooms and the two locked ticket rooms are visible only to staff. The other named Discord rooms are shared member rooms. Each voice room has its own text chat and supports up to six people in voice.
+
+The original main chat, music chat, and lounge keep their existing room IDs and history. The site is a separate community and does not import Discord messages, roles, or ticket history. Help Desk channels are chat rooms and do not create private tickets. The Gaming Zone contains chat rooms.

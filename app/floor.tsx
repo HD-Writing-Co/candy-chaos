@@ -51,7 +51,7 @@ export default function Floor({me,onProfile,onSetup,onVoice}:{me:Profile|null;on
   }
   const visible=[...players.filter(p=>p.id!==me?.id),...(me?[{...me,...pos}]:[])].sort((a,b)=>a.y-b.y);
   return <section className="floor">
-    <header className="floor-header"><div><span className="eyebrow"><Sparkles size={14}/> VIRTUAL CLUB</span><h1>Club Floor</h1><p>Click or tap to move. On desktop, focus the floor and use the arrow keys or WASD.</p></div><button className="subtle" onClick={onVoice}><Headphones size={17}/> Open Neon Lounge</button></header>
+    <header className="floor-header"><div><span className="eyebrow"><Sparkles size={14}/> VIRTUAL CLUB</span><h1>Club Floor</h1><p>Click or tap to move. On desktop, focus the floor and use the arrow keys or WASD.</p></div><button className="subtle" onClick={onVoice}><Headphones size={17}/> Open Candy Shop</button></header>
     <div className="floor-stage" ref={stage} tabIndex={0} role="region" aria-label="Club floor. Use arrow keys or WASD to move your avatar." onKeyDown={key} onClick={event=>{
       const rect=event.currentTarget.getBoundingClientRect();
       stage.current?.focus({preventScroll:true});

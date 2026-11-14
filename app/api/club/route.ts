@@ -1,6 +1,7 @@
 import { db } from "../../../db/database";
 import { getUser } from "../../auth";
-import { avatars, houseRooms, type Room } from "../../club-data";
+import { getRole, ownerEmail } from "../../club-roles";
+import { avatars, houseRooms, isStaff, roles, type Room } from "../../club-data";
 
 export const dynamic = "force-dynamic";
 const reply = (data:unknown,status=200) => Response.json(data,{status,headers:{"Cache-Control":"no-store"}});
@@ -15,9 +16,11 @@ async function getRoom(id:string) {
 export async function GET(req:Request) {
   const user=await getUser();
   if(!user) return fail("Sign in to enter the club.",401);
+  const role=await getRole(user.userId);
   const q=new URL(req.url).searchParams;
   const room=await getRoom(clean(q.get("room"),64));
   if(!room) return fail("This room is unavailable.",404);
+  if(room.staff&&!isStaff(role)) return fail("This room is for staff.",403);
   const now=Date.now();
   const session=token(q.get("session"));
   const database=db();
@@ -35,9 +38,9 @@ export async function GET(req:Request) {
   );
   const memberQuery=clean(q.get("memberQuery"),50);
   const directoryIndex=q.has("memberQuery")?statements.length:-1;
-  if(directoryIndex>=0) statements.push(database.prepare("SELECT id,name,avatar,bio FROM profiles WHERE instr(lower(name), lower(?))>0 OR ?='' ORDER BY name,id LIMIT 100").bind(memberQuery,memberQuery));
+  if(directoryIndex>=0) statements.push(database.prepare("SELECT p.id,p.name,p.avatar,p.bio,CASE WHEN EXISTS (SELECT 1 FROM verified_accounts v WHERE v.id=p.id AND v.email=?) THEN 'admin' ELSE COALESCE(r.role,'member') END AS role FROM profiles p LEFT JOIN club_roles r ON r.user_id=p.id WHERE instr(lower(p.name), lower(?))>0 OR ?='' ORDER BY p.name,p.id LIMIT 100").bind(ownerEmail(),memberQuery,memberQuery));
   const rows=await database.batch(statements);
-  return reply({me:rows[0].results[0]??null,rooms:[...houseRooms,...rows[1].results],
+  return reply({role,me:rows[0].results[0]??null,rooms:[...houseRooms.filter(room=>!room.staff||isStaff(role)),...rows[1].results],
     messages:rows[2].results.reverse(),members:rows[3].results,counts:rows[4].results,directory:rows[directoryIndex]?.results??[],
     peers:session?(rows[5]?.results??[]):[],signals:session?(rows[6]?.results??[]):[]});
 }
@@ -59,6 +62,20 @@ export async function POST(req:Request) {
     return reply({ok:true});
   }
   if(!await database.prepare("SELECT id FROM profiles WHERE id=?").bind(id).first()) return fail("Set up your profile first.",403);
+  if(a.action==="role"){
+    const target=token(a.target);
+    if(!target||!roles.includes(a.role)) return fail("Choose a profile and role.");
+    if(target===id) return fail("Manage roles from a different admin account.",403);
+    const owner=ownerEmail();
+    // Check the actor and protect the owner in the same statement that performs the write.
+    const guard="EXISTS (SELECT 1 FROM profiles WHERE id=?) AND NOT EXISTS (SELECT 1 FROM verified_accounts WHERE id=? AND email=?) AND (EXISTS (SELECT 1 FROM verified_accounts WHERE id=? AND email=?) OR EXISTS (SELECT 1 FROM club_roles WHERE user_id=? AND role='admin'))";
+    if(await getRole(id)!=="admin") return fail("Only admins can assign roles.",403);
+    const result= a.role==="member"
+      ? await database.prepare("DELETE FROM club_roles WHERE user_id=? AND "+guard).bind(target,target,target,owner,id,owner,id).run()
+      : await database.prepare("INSERT INTO club_roles(user_id,role) SELECT ?,? WHERE "+guard+" ON CONFLICT(user_id) DO UPDATE SET role=excluded.role").bind(target,a.role,target,target,owner,id,owner,id).run();
+    if(!result.meta.changes) return fail("No role changed. The owner role is managed in deployment settings.",409);
+    return reply({ok:true});
+  }
   if(a.action==="create"){
     const name=clean(a.name,32), description=clean(a.description,100);
     if(name.length<2 || !["text","voice"].includes(a.kind)) return fail("Choose a room name and type.");
@@ -68,6 +85,7 @@ export async function POST(req:Request) {
   }
   const room=await getRoom(clean(a.room,64));
   if(!room) return fail("This room is unavailable.",404);
+  if(room.staff&&!isStaff(await getRole(id))) return fail("This room is for staff.",403);
   const session=token(a.session);
   if(a.action==="presence"){
     const tasks=[database.prepare("INSERT INTO presence VALUES (?,?,?) ON CONFLICT(user) DO UPDATE SET room=excluded.room,seen=excluded.seen").bind(id,room.id,now)];

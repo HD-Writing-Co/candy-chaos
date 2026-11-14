@@ -85,3 +85,8 @@ CREATE TABLE IF NOT EXISTS account_sessions (
 );
 CREATE INDEX IF NOT EXISTS account_sessions_expiry ON account_sessions(expires);
 CREATE INDEX IF NOT EXISTS signup_tokens_expiry ON signup_tokens(expires);
+
+CREATE TABLE IF NOT EXISTS club_roles (
+  user_id TEXT PRIMARY KEY,
+  role TEXT NOT NULL CHECK (role IN ('moderator','admin'))
+);

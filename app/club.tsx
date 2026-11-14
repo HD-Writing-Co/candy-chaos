@@ -1,19 +1,20 @@
 "use client";
 
 import { useCallback,useEffect,useRef,useState,type FormEvent } from "react";
-import { ArrowRight,AudioLines,DoorOpen,Hash,Headphones,Menu,Mic,MicOff,Plus,Radio,Send,Search,Settings2,Sparkles,Users,X,Zap } from "lucide-react";
-import { avatars,houseRooms,type Profile,type Room } from "./club-data";
+import { ArrowRight,AudioLines,ChevronDown,Lock,DoorOpen,Hash,Headphones,Menu,Mic,MicOff,Plus,Radio,Send,Search,Settings2,Sparkles,Users,X,Zap } from "lucide-react";
+import { avatars,houseRooms,roomCategories,roles,type Role,type Profile,type Room } from "./club-data";
 import Floor from "./floor";
 import { Voice,type Peer,type Signal } from "./voice";
 
 type Message={id:number;user:string;name:string;avatar:string;bio:string;body:string;created:number};
-type ClubData={me:Profile|null;rooms:Room[];messages:Message[];members:Profile[];directory:Profile[];counts:{room:string;total:number}[];peers:Peer[];signals:Signal[]};
-const empty:ClubData={me:null,rooms:houseRooms,messages:[],members:[],directory:[],counts:[],peers:[],signals:[]};
+type ClubData={role:Role;me:Profile|null;rooms:Room[];messages:Message[];members:Profile[];directory:Profile[];counts:{room:string;total:number}[];peers:Peer[];signals:Signal[]};
+const empty:ClubData={role:"member",me:null,rooms:houseRooms.filter(room=>!room.staff),messages:[],members:[],directory:[],counts:[],peers:[],signals:[]};
+class ApiError extends Error { constructor(message:string,readonly status:number){super(message);} }
 async function api<T>(values?:Record<string,unknown>,query?:URLSearchParams):Promise<T>{
   const response=await fetch("/api/club"+(query?"?"+query:""),values?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(values)}:{cache:"no-store"});
   if(!response.ok){
     const failure=await response.json().catch(()=>null) as {error?:string}|null;
-    throw new Error(failure?.error||"The club is temporarily unavailable.");
+    throw new ApiError(failure?.error||"The club is temporarily unavailable.",response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -26,6 +27,7 @@ const errorText=(e:unknown)=>e instanceof Error?e.message:"Something went wrong.
 export default function Club({signedIn,signIn}:{signedIn:boolean;signIn:string}){
   const [data,setData]=useState<ClubData>(empty),[roomId,setRoomId]=useState("lobby"),[dialog,setDialog]=useState<"profile"|"room"|null>(null);
   const [view,setView]=useState<"chat"|"floor"|"members">("chat"),[memberQuery,setMemberQuery]=useState(""),[directory,setDirectory]=useState<Profile[]>([]),[directoryStatus,setDirectoryStatus]=useState("");
+  const [roomSearch,setRoomSearch]=useState(""),[roleChoice,setRoleChoice]=useState<Role>("member"),[roleStatus,setRoleStatus]=useState("");
   const [loaded,setLoaded]=useState(false),[nav,setNav]=useState(false),[people,setPeople]=useState(false),[member,setMember]=useState<Profile|null>(null);
   const [draft,setDraft]=useState(""),[error,setError]=useState(""),[sending,setSending]=useState(false);
   const [name,setName]=useState(""),[bio,setBio]=useState(""),[avatar,setAvatar]=useState(avatars[0]),[kind,setKind]=useState("voice"),[saving,setSaving]=useState(false);
@@ -58,7 +60,12 @@ export default function Club({signedIn,signIn}:{signedIn:boolean;signIn:string})
     lastBeat.current=0;
     const loop=async()=>{
       try {await refresh(roomId,hasProfile);}
-      catch(e){if(!stopped) setError(errorText(e));}
+      catch(e){
+        if(!stopped&&e instanceof ApiError&&e.status===403&&roomId!=="lobby"){
+          setData(old=>({...old,messages:[],rooms:old.rooms.filter(room=>!room.staff),role:"member"}));
+          setRoomId("lobby");setDraft("");setError(errorText(e));
+        }else if(!stopped) setError(errorText(e));
+      }
       if(!stopped) timer=setTimeout(loop,voice.current?1100:2400);
     };
     void loop();
@@ -158,7 +165,22 @@ export default function Club({signedIn,signIn}:{signedIn:boolean;signIn:string})
     if(destination==="members"){setDirectory([]);setDirectoryStatus("Loading members…");setMemberQuery("");}
     setView(destination);setNav(false);setPeople(false);
   }
-  function showProfile(profile:Profile){if(profile.id===me?.id)openProfile();else setMember(profile);}
+  function showProfile(profile:Profile){
+    if(profile.id===me?.id){openProfile();return;}
+    const known=directory.find(item=>item.id===profile.id);
+    setMember(known??profile);setRoleChoice(known?.role??profile.role??"member");setRoleStatus("");
+  }
+  async function saveRole(event:FormEvent){
+    event.preventDefault();
+    if(!member) return;
+    setSaving(true);setRoleStatus("");
+    try{
+      await api({action:"role",target:member.id,role:roleChoice});
+      setMember({...member,role:roleChoice});
+      setDirectory(items=>items.map(item=>item.id===member.id?{...item,role:roleChoice}:item));
+      setRoleStatus("Role updated.");
+    }catch(e){setRoleStatus(errorText(e));}finally{setSaving(false);}
+  }
   const connectedRoom=joined?data.rooms.find(r=>r.id===voice.current?.room):null;
   const count=(id:string)=>data.counts.find(x=>x.room===id)?.total??0;
   const canChat=signedIn&&!!me;
@@ -172,7 +194,19 @@ export default function Club({signedIn,signIn}:{signedIn:boolean;signIn:string})
         <div className="section-title">THE CLUB</div>
         <button className={"side-link home"+(view==="floor"?" chosen":"")} aria-current={view==="floor"?"page":undefined} onClick={()=>navigate("floor")}><Sparkles size={17}/> Club Floor</button>
         <button className={"side-link home"+(view==="members"?" chosen":"")} aria-current={view==="members"?"page":undefined} onClick={()=>navigate("members")}><Users size={17}/> Members</button>
-        {["text","voice"].map(type=><section className="channels" key={type}><div className="section-title"><span>{type==="text"?"TEXT CHANNELS":"VOICE CHANNELS"}</span><button title={"Create "+type+" channel"} aria-label={"Create "+type+" channel"} onClick={()=>{openRoom();setKind(type);}}><Plus size={17}/></button></div>{data.rooms.filter(r=>r.kind===type).map(r=><button key={r.id} disabled={joining} aria-current={view==="chat"&&r.id===roomId?"page":undefined} className={"side-link"+(view==="chat"&&r.id===roomId?" chosen":"")} onClick={()=>select(r.id)}>{type==="text"?<Hash size={17}/>:<AudioLines size={17}/>}<span>{r.id==="lobby"?"Main Chat":r.name}</span>{type==="voice"&&<em>{connectedRoom?.id===r.id?<i aria-label="Connected"/>:count(r.id)||null}</em>}</button>)}</section>)}
+        <label className="room-search"><Search size={16}/><input aria-label="Find a room" placeholder="Find a room" value={roomSearch} onChange={event=>setRoomSearch(event.target.value)}/></label>
+        {roomCategories.map(category=>{
+          const rooms=data.rooms.filter(r=>(r.category??"Community Rooms")===category&&r.name.toLowerCase().includes(roomSearch.trim().toLowerCase()));
+          if(!rooms.length) return null;
+          return <details className="room-group" key={category+Boolean(roomSearch)} open><summary><span>{category}</span><ChevronDown size={13}/></summary>
+            {rooms.map(r=><button key={r.id} disabled={joining} aria-current={view==="chat"&&r.id===roomId?"page":undefined} className={"side-link"+(view==="chat"&&r.id===roomId?" chosen":"")} onClick={()=>select(r.id)}>
+              {r.staff?<Lock size={15}/>:r.kind==="voice"?<AudioLines size={16}/>:<Hash size={16}/>}
+              {r.emoji&&<span className="room-emoji" aria-hidden="true">{r.emoji}</span>}<span className="room-name">{r.name}</span>
+              {r.kind==="voice"&&<em>{connectedRoom?.id===r.id?<i aria-label="Connected"/>:count(r.id)||null}</em>}
+            </button>)}
+          </details>;
+        })}
+        {roomSearch&&!data.rooms.some(r=>r.name.toLowerCase().includes(roomSearch.trim().toLowerCase()))&&<p className="people-empty">No rooms found.</p>}
         <button className="create" onClick={openRoom}><Plus size={18}/> Create channel</button>
       </div>
       {connectedRoom&&<div className="connected"><button onClick={()=>select(connectedRoom.id)}><i/> Voice connected <strong>{connectedRoom.name}</strong></button><div><button aria-label={muted?"Unmute microphone":"Mute microphone"} onClick={()=>{voice.current?.mute(!muted);setMuted(!muted);}}>{muted?<MicOff size={17}/>:<Mic size={17}/>}</button><button aria-label="Disconnect voice" onClick={leave}><DoorOpen size={17}/></button></div>{voiceStatus&&<small role="status">{voiceStatus}</small>}</div>}
@@ -181,21 +215,21 @@ export default function Club({signedIn,signIn}:{signedIn:boolean;signIn:string})
 
     <main className="main">
       <header className="top"><button className="icon mobile-menu" aria-label="Open channels" onClick={()=>{setPeople(false);setNav(true);}}><Menu size={22}/></button><div className="crumb">{view==="floor"?<Sparkles size={19}/>:view==="members"?<Users size={19}/>:room.kind==="voice"?<AudioLines size={19}/>:<Hash size={19}/>}<strong>{view==="floor"?"Club Floor":view==="members"?"Members":room.name}</strong></div><div className="top-actions"><button className="top-profile" onClick={action}><span className="mini-avatar">{me?.avatar??"👾"}</span><span>{signedIn?"My Profile":"Sign in"}</span></button><button className="online" aria-label="Online members" aria-expanded={people} onClick={()=>{setNav(false);setPeople(!people);}}><i/>{data.members.length}<span> online</span></button></div></header>
-      {view==="floor"?<div className="content"><Floor me={me} onProfile={showProfile} onSetup={action} onVoice={()=>select("neon-lounge")}/></div>:view==="members"?<div className="content"><section className="directory"><header><h1>Members</h1><p>Find someone and open their club profile.</p></header>{signedIn?<><label className="member-search"><Search size={18}/><input aria-label="Search members by nickname" placeholder="Search by nickname" maxLength={50} value={memberQuery} onChange={event=>{setDirectory([]);setDirectoryStatus("Searching…");setMemberQuery(event.target.value);}}/></label><div className="member-grid">{directory.map(p=><button key={p.id} className="person" onClick={()=>showProfile(p)}><span className="avatar">{p.avatar}</span><span><strong>{p.name}</strong><small>{p.id===me?.id?"You":data.members.some(m=>m.id===p.id)?"Online":p.bio||"View profile"}</small></span></button>)}</div>{directoryStatus&&<p role="status">{directoryStatus}</p>}</>:<button className="primary" onClick={action}>Sign in to browse members</button>}</section></div>:
+      {view==="floor"?<div className="content"><Floor me={me} onProfile={showProfile} onSetup={action} onVoice={()=>select("neon-lounge")}/></div>:view==="members"?<div className="content"><section className="directory"><header><h1>Members</h1><p>{data.role==="admin"?"Open a member profile to assign or remove a role.":"Find someone and open their club profile."}</p></header>{signedIn?<><label className="member-search"><Search size={18}/><input aria-label="Search members by nickname" placeholder="Search by nickname" maxLength={50} value={memberQuery} onChange={event=>{setDirectory([]);setDirectoryStatus("Searching…");setMemberQuery(event.target.value);}}/></label><div className="member-grid">{directory.map(p=><button key={p.id} className="person" onClick={()=>showProfile(p)}><span className="avatar">{p.avatar}</span><span><strong>{p.name}</strong><small>{p.id===me?.id?"You":p.role&&p.role!=="member"?p.role:data.members.some(m=>m.id===p.id)?"Online":p.bio||"View profile"}</small></span></button>)}</div>{directoryStatus&&<p role="status">{directoryStatus}</p>}</>:<button className="primary" onClick={action}>Sign in to browse members</button>}</section></div>:
       <div className="content chat-content">
-        {room.id==="lobby"&&<section className="lobby-strip"><div><h1>The Lobby</h1><p>Say hello here, or take your avatar onto the club floor.</p></div><button className="primary" onClick={()=>navigate("floor")}><Sparkles size={17}/> Explore the Club Floor</button></section>}
+        {room.id==="lobby"&&<section className="lobby-strip"><div><h1>Chaos &amp; Candy</h1><p>Pick a room from the directory or join the conversation here.</p></div><button className="primary" onClick={()=>navigate("floor")}><Sparkles size={17}/> Explore the Club Floor</button></section>}
         {room.kind==="voice"&&<section className="room-hero voice-hero"><div className="voice-heading"><div><div className="eyebrow"><Radio size={15}/> VOICE CHANNEL</div><h1>{room.name}</h1><p>{room.description||"Make yourself at home."}</p></div><span className="voice-count">{count(room.id)}/6 in voice</span></div><div className="voice-controls">
           {connectedRoom?.id===room.id?<><button className="primary" onClick={()=>{voice.current?.mute(!muted);setMuted(!muted);}}>{muted?<MicOff size={17}/>:<Mic size={17}/>} {muted?"Unmute":"Mute"}</button><button className="subtle" onClick={leave}><DoorOpen size={17}/> Disconnect</button><button className="subtle" onClick={()=>voice.current?.enableAudio()}><Headphones size={16}/> Enable audio</button></>:<button className="primary" disabled={joining||count(room.id)>=6} onClick={join}><Mic size={17}/>{joining?"Connecting…":count(room.id)>=6?"Channel is full":connectedRoom?"Switch to this voice channel":"Join voice"}</button>}
         </div>{connectedRoom?.id===room.id&&data.peers.length>0&&<div className="peer-list">{data.peers.map(p=><span key={p.session}>{p.avatar} {p.name}</span>)}</div>}</section>}
 
-        <section className="chat"><header><span className="chat-icon"><Hash size={20}/></span><div><h2>{room.id==="lobby"?"Main Chat":room.kind==="voice"?"Channel Chat":room.name}</h2><p>{room.id==="lobby"?"The club’s main text channel.":room.kind==="voice"?"Text chat alongside voice.":room.description||"Talk with other club members."}</p></div></header>
+        <section className="chat"><header><span className="chat-icon"><Hash size={20}/></span><div><h2>{room.kind==="voice"?"Room chat":room.name}</h2><p>{[room.category,room.description].filter(Boolean).join(" · ")}</p></div></header>
           <div className="messages" aria-label="Channel messages">
             {!data.messages.length&&<div className="empty">{signedIn&&!loaded?"Connecting to the club…":"No messages yet. Start the conversation."}</div>}
             {data.messages.map(m=><article className="message" key={m.id}><button className="avatar" aria-label={"View "+m.name+"'s profile"} onClick={()=>showProfile({id:m.user,name:m.name,avatar:m.avatar,bio:m.bio})}>{m.avatar}</button><div><strong>{m.name}</strong><time dateTime={new Date(m.created).toISOString()}>{new Date(m.created).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})}</time><p>{m.body}</p></div></article>)}
             <div ref={end}/>
           </div>
           {error&&!dialog&&<p className="error" role="alert">{error}</p>}
-          {canChat?<form className="composer" onSubmit={message}><input aria-label="Message" placeholder={room.id==="lobby"?"Message Main Chat":"Message "+room.name} value={draft} maxLength={1000} onChange={e=>setDraft(e.target.value)}/><button className="primary" aria-label="Send message" disabled={sending||!draft.trim()}><Send size={17}/></button></form>:<div className="composer"><span>{signedIn?"Set up your profile to post.":"Sign in to join the conversation."}</span><button className="subtle" onClick={action}>{signedIn?"Set up profile":"Sign in"}<ArrowRight size={15}/></button></div>}
+          {canChat?<form className="composer" onSubmit={message}><input aria-label="Message" placeholder={"Message "+room.name} value={draft} maxLength={1000} onChange={e=>setDraft(e.target.value)}/><button className="primary" aria-label="Send message" disabled={sending||!draft.trim()}><Send size={17}/></button></form>:<div className="composer"><span>{signedIn?"Set up your profile to post.":"Sign in to join the conversation."}</span><button className="subtle" onClick={action}>{signedIn?"Set up profile":"Sign in"}<ArrowRight size={15}/></button></div>}
         </section>
       </div>}
       {!connectedRoom&&voiceStatus&&<p className="error" role="status">{voiceStatus}</p>}
@@ -206,7 +240,7 @@ export default function Club({signedIn,signIn}:{signedIn:boolean;signIn:string})
 
     <dialog ref={modal} onCancel={()=>{setDialog(null);setMember(null);}} className="modal">
       <button className="icon close" aria-label="Close dialog" onClick={()=>{setDialog(null);setMember(null);}}><X size={22}/></button>
-      {member?<><span className="avatar profile-avatar">{member.avatar}</span><h2>{member.name}</h2>{member.bio&&<p>{member.bio}</p>}</>:<><h2>{dialog==="room"?"Create channel":"Your club profile"}</h2><form onSubmit={save}>
+      {member?<><span className="avatar profile-avatar">{member.avatar}</span><h2>{member.name}</h2>{member.bio&&<p>{member.bio}</p>}{member.role&&<p className="profile-role">{member.role}</p>}{data.role==="admin"&&member.role&&<form className="role-form" onSubmit={saveRole}><label>Club role<select value={roleChoice} onChange={event=>setRoleChoice(event.target.value as Role)}>{roles.map(role=><option value={role} key={role}>{role}</option>)}</select></label><button className="primary" disabled={saving||roleChoice===member.role}>Save role</button>{roleStatus&&<p role="status">{roleStatus}</p>}</form>}</>:<><h2>{dialog==="room"?"Create channel":"Your club profile"}</h2><form onSubmit={save}>
         <label>{dialog==="room"?"Room name":"Nickname"}<input autoFocus required minLength={2} maxLength={dialog==="room"?32:24} value={name} onChange={e=>setName(e.target.value)}/></label>
         <label>{dialog==="room"?"Description":"Bio"}<textarea maxLength={dialog==="room"?100:180} rows={2} value={bio} onChange={e=>setBio(e.target.value)}/></label>
         {dialog==="room"?<label>Room type<select value={kind} onChange={e=>setKind(e.target.value)}><option value="voice">Voice + text</option><option value="text">Text only</option></select></label>:<fieldset><legend>Avatar</legend><div className="avatar-picker">{avatars.map(a=><button type="button" key={a} onClick={()=>setAvatar(a)} aria-label={a} aria-pressed={a===avatar}>{a}</button>)}</div></fieldset>}
