@@ -34,3 +34,9 @@ Open [http://localhost:3000](http://localhost:3000). Local SQLite data is stored
 ## Voice rooms
 
 Open the deployed site in a browser tab, enter the same voice room on two accounts, choose **Join voice**, and grant microphone access. Use headphones during the test to avoid feedback. The default configuration attempts a direct WebRTC connection. If participants on different networks cannot hear one another, configure `TURN_URLS` (comma-separated relay URLs), `TURN_USERNAME`, and `TURN_CREDENTIAL` in Vercel and redeploy. Use relay credentials scoped to this app because authenticated browsers receive them when they join voice.
+
+## Updating an existing Chaos & Candy deployment
+
+1. Keep your existing Turso database and Vercel environment variables. In your local copy of the updated project, point `.env.local` at that database and run `npm run db:setup`, or apply the `CREATE TABLE IF NOT EXISTS club_floor` and `CREATE INDEX IF NOT EXISTS club_floor_seen` statements at the end of `db/schema.sql`. This adds the avatar floor to the same database and preserves accounts, profiles, rooms, and chat history.
+2. Copy the contents of this ZIP's `chaos-and-candy` folder into the root of your existing GitHub project. Keep your private environment file out of the commit. Commit to the branch your Vercel project deploys.
+3. Open **Main Chat** to post, **Club Floor** to move and emote, **Members** to search profiles, and **My Profile** to edit your avatar. Join voice explicitly from a voice channel. You can browse the club while voice stays connected, and disconnect using the controls under the channel list.

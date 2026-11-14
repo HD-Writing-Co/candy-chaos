@@ -130,3 +130,61 @@ input,select,textarea{background:#100c19;border:1px solid #3c2e4b;border-radius:
 .auth-back{display:inline-flex;align-items:center;gap:7px;margin-bottom:18px;text-decoration:none}
 .auth-switch{margin-top:14px;padding:5px 0;text-align:left}
 .sign-out{font-size:12px;margin:2px 8px;padding:5px 0}
+
+.top-actions{display:flex;align-items:center;gap:12px}
+.top-profile{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:9px;padding:6px 9px;color:#ead7ff;font-weight:700;white-space:nowrap}
+.top-profile:hover{background:#261936}
+.mini-avatar{font-size:17px;line-height:1}
+.crumb{font-size:16px}
+.main{min-width:0;min-height:100dvh;display:flex;flex-direction:column}
+.main>.content{width:100%;margin:0 auto}
+.chat-content{flex:1;min-height:0;display:flex;flex-direction:column}
+.chat-content .chat{flex:1;display:flex;min-height:340px;flex-direction:column}
+.chat-content .messages{flex:1;max-height:clamp(260px,52vh,640px)}
+.lobby-strip{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid #4a305d;border-radius:13px;padding:17px 20px;background:linear-gradient(90deg,#160c23f5,#20102ac9),url('/club.webp') center 53%/cover}
+.lobby-strip h1,.directory h1,.floor-header h1{font-size:clamp(24px,4vw,38px);letter-spacing:-.045em}
+.lobby-strip p,.directory p,.floor-header p{color:#d3c4e1;margin-top:5px;line-height:1.5}
+.voice-heading{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.voice-count{color:var(--teal);white-space:nowrap;font-size:12px;padding:6px 8px;border-radius:8px;background:#142722}
+.connected{border-top:1px solid var(--line);background:#14221f;padding:9px 10px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px}
+.connected>button{flex:1;min-width:0;text-align:left;color:var(--teal);font-size:11px;padding:4px}
+.connected strong{display:block;color:var(--text);overflow:hidden;text-overflow:ellipsis}
+.connected>div{display:flex;align-items:center}
+.connected>div button{padding:6px;border-radius:5px}
+.connected>div button:hover{background:#223c34}
+.connected>small{flex-basis:100%;color:#f5c4ff}
+.browse-members{color:#d8a8ff;display:flex;align-items:center;gap:7px;padding:8px;font-weight:700}
+.directory{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:20px}
+.directory header{margin-bottom:17px}
+.member-search{display:flex;align-items:center;gap:10px;color:var(--purple);max-width:430px}
+.member-search input{flex:1;min-width:0}
+.member-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:8px;margin-top:14px}
+.member-grid .person{border:1px solid var(--line);background:#191322;padding:10px}
+.member-grid .person:hover{border-color:#6c4e87}
+.floor{border:1px solid #4a305d;border-radius:15px;background:var(--panel);overflow:hidden}
+.floor-header,.floor-footer{padding:16px;display:flex;justify-content:space-between;gap:14px;align-items:center}
+.floor-header p{font-size:13px}
+.floor-stage{position:relative;overflow:hidden;isolation:isolate;height:clamp(300px,53vh,570px);background:radial-gradient(ellipse at 48% 45%,#29143a,#141021 61%,#0c0a13);cursor:crosshair;touch-action:manipulation}
+.floor-wall{position:absolute;inset:0 0 78%;background:linear-gradient(165deg,#271434,#20152e 45%,#172b36);border-bottom:2px solid #6d457c;box-shadow:0 9px 26px #0009}
+.floor-tiles{position:absolute;left:25%;right:25%;top:25%;bottom:12%;display:grid;place-items:end center;padding:8px;color:#d6a5ff;border:2px solid #aa5bc5;border-radius:14px;background:repeating-conic-gradient(#623c794e 0% 25%,#aa4c9540 0% 50%) 0 0/52px 52px,linear-gradient(140deg,#3c164f,#091d2d);box-shadow:0 0 30px #c053ed60,inset 0 0 30px #ab4be14a}
+.floor-booth{position:absolute;left:50%;top:8%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;justify-content:center;white-space:nowrap;padding:9px 14px;border-radius:12px;border:1px solid #df90fd;background:#261433;color:#fac7ff;font-size:11px;box-shadow:0 0 20px #a240d690}
+.floor-neon{position:absolute;top:11%;width:21%;height:3px;border-radius:50%;background:currentColor;box-shadow:0 0 18px 4px currentColor}
+.floor-neon.left{left:7%;color:#ed78c2;transform:rotate(8deg)}
+.floor-neon.right{right:7%;color:#6ee8de;transform:rotate(-8deg)}
+.floor-couch{position:absolute;top:36%;width:15%;height:29%;border:2px solid currentColor;border-radius:12px;background:#32223f;box-shadow:inset 0 0 18px #080511,0 0 18px color-mix(in srgb,currentColor 25%,transparent)}
+.floor-couch.left,.floor-zone.left{left:6%;color:#f29bce}
+.floor-couch.right,.floor-zone.right{right:6%;color:#8bece0}
+.floor-zone{position:absolute;top:68%;width:15%;text-align:center}
+.floor-zone,.floor-tiles span{font-size:9px;font-weight:700;letter-spacing:.1em;pointer-events:none}
+.floor-player{position:absolute;transform:translate(-50%,-50%);display:grid;justify-items:center;gap:2px;max-width:92px;padding:0;z-index:1;transition:top .17s linear,left .17s linear}
+.floor-player.self{z-index:2}
+.floor-avatar{display:grid;place-items:center;width:39px;height:39px;border:2px solid #e2a5ff;border-radius:50%;background:#322048;box-shadow:0 5px 8px #000b,0 0 12px #b370fb85;font-size:24px}
+.floor-player.self .floor-avatar{border-color:var(--teal);box-shadow:0 0 0 3px #63e7d347}
+.floor-name{display:block;max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#100b1be8;color:#fff;padding:2px 5px;border-radius:5px;font-size:10px}
+.floor-emote{position:absolute;right:-12px;top:-10px;border-radius:100%;padding:3px;background:#241632}
+.floor-footer{border-top:1px solid var(--line);min-height:57px;color:#d4c6e3}
+.floor-footer>span{display:flex;align-items:center;gap:8px}
+.emotes{display:flex;gap:5px}
+.emotes button{font-size:17px;border:1px solid var(--line);border-radius:7px;padding:4px 7px}
+.emotes button[aria-pressed=true]{border-color:var(--teal);background:#16342e}
+@media(max-width:640px){.top-actions{gap:5px}.top-profile{padding:5px}.online{padding:5px 7px}.online span{display:none}.lobby-strip,.floor-header{align-items:flex-start;flex-direction:column}.floor-stage{height:370px}.floor-avatar{width:33px;height:33px;font-size:20px}.floor-zone{font-size:7px}.chat-content .chat{min-height:300px}.chat-content .messages{max-height:46vh}}

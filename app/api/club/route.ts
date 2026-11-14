@@ -24,18 +24,22 @@ export async function GET(req:Request) {
   const statements=[
     database.prepare("SELECT * FROM profiles WHERE id=?").bind(user.userId),
     database.prepare("SELECT id,name,description,kind,owner FROM rooms ORDER BY created DESC LIMIT 100"),
-    database.prepare("SELECT m.id,m.body,m.created,p.id AS user,p.name,p.avatar FROM messages m JOIN profiles p ON m.user=p.id WHERE room=? ORDER BY m.id DESC LIMIT 80").bind(room.id),
+    database.prepare("SELECT m.id,m.body,m.created,p.id AS user,p.name,p.avatar,p.bio FROM messages m JOIN profiles p ON m.user=p.id WHERE room=? ORDER BY m.id DESC LIMIT 80").bind(room.id),
     database.prepare("SELECT p.* FROM presence a JOIN profiles p ON a.user=p.id WHERE a.seen>? ORDER BY p.name LIMIT 80").bind(now-35000),
     database.prepare("SELECT room,COUNT(*) AS total FROM voice WHERE seen>? GROUP BY room").bind(now-20000),
   ];
-  if(session && room.kind==="voice") statements.push(
-    database.prepare("SELECT v.session,p.name,p.avatar FROM voice v JOIN profiles p ON v.user=p.id WHERE v.room=? AND v.seen>? AND EXISTS (SELECT 1 FROM voice WHERE room=? AND session=? AND user=? AND seen>?)").bind(room.id,now-20000,room.id,session,user.userId,now-20000),
-    database.prepare("SELECT id,sender,payload FROM signals WHERE room=? AND recipient=? AND id>? AND created>? AND EXISTS (SELECT 1 FROM voice WHERE room=? AND session=? AND user=? AND seen>?) ORDER BY id LIMIT 100").bind(room.id,session,Number(q.get("after"))||0,now-60000,room.id,session,user.userId,now-20000),
+  const voiceRoom=clean(q.get("voiceRoom"),64)||room.id;
+  if(session) statements.push(
+    database.prepare("SELECT v.session,p.name,p.avatar FROM voice v JOIN profiles p ON v.user=p.id WHERE v.room=? AND v.seen>? AND EXISTS (SELECT 1 FROM voice WHERE room=? AND session=? AND user=? AND seen>?)").bind(voiceRoom,now-20000,voiceRoom,session,user.userId,now-20000),
+    database.prepare("SELECT id,sender,payload FROM signals WHERE room=? AND recipient=? AND id>? AND created>? AND EXISTS (SELECT 1 FROM voice WHERE room=? AND session=? AND user=? AND seen>?) ORDER BY id LIMIT 100").bind(voiceRoom,session,Number(q.get("after"))||0,now-60000,voiceRoom,session,user.userId,now-20000),
   );
+  const memberQuery=clean(q.get("memberQuery"),50);
+  const directoryIndex=q.has("memberQuery")?statements.length:-1;
+  if(directoryIndex>=0) statements.push(database.prepare("SELECT id,name,avatar,bio FROM profiles WHERE instr(lower(name), lower(?))>0 OR ?='' ORDER BY name,id LIMIT 100").bind(memberQuery,memberQuery));
   const rows=await database.batch(statements);
   return reply({me:rows[0].results[0]??null,rooms:[...houseRooms,...rows[1].results],
-    messages:rows[2].results.reverse(),members:rows[3].results,counts:rows[4].results,
-    peers:rows[5]?.results??[],signals:rows[6]?.results??[]});
+    messages:rows[2].results.reverse(),members:rows[3].results,counts:rows[4].results,directory:rows[directoryIndex]?.results??[],
+    peers:session?(rows[5]?.results??[]):[],signals:session?(rows[6]?.results??[]):[]});
 }
 
 export async function POST(req:Request) {
@@ -67,7 +71,7 @@ export async function POST(req:Request) {
   const session=token(a.session);
   if(a.action==="presence"){
     const tasks=[database.prepare("INSERT INTO presence VALUES (?,?,?) ON CONFLICT(user) DO UPDATE SET room=excluded.room,seen=excluded.seen").bind(id,room.id,now)];
-    if(session && room.kind==="voice") tasks.push(database.prepare("UPDATE voice SET seen=? WHERE room=? AND session=? AND user=?").bind(now,room.id,session,id));
+    if(session) tasks.push(database.prepare("UPDATE voice SET seen=? WHERE room=? AND session=? AND user=?").bind(now,clean(a.voiceRoom,64)||room.id,session,id));
     await database.batch(tasks);
     return reply({ok:true});
   }

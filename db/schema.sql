@@ -57,3 +57,12 @@ CREATE TABLE IF NOT EXISTS auth_attempts (
   window INTEGER NOT NULL,
   attempts INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS club_floor (
+  user TEXT PRIMARY KEY,
+  x INTEGER NOT NULL,
+  y INTEGER NOT NULL,
+  emote TEXT NOT NULL,
+  seen INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS club_floor_seen ON club_floor(seen);

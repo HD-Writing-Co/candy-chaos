@@ -8,3 +8,4 @@ export const houseRooms = [
 ];
 export type Room = (typeof houseRooms)[number];
 export type Profile = {id:string; name:string; avatar:string; bio:string};
+export const floorEmotes=["","👋","💃","✨"];
