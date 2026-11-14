@@ -1,13 +1,16 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { db } from "../db/database";
 
 export const cookieName="chaos_session";
 export const sessionAge=60*60*24*14;
+export const tokenPattern=/^[A-Za-z0-9_-]{43}$/;
+export const newToken=()=>randomBytes(32).toString("base64url");
 
-function sign(payload:string){
+export function digest(value:string){
   const secret=process.env.SESSION_SECRET;
   if(!secret||secret.length<32) throw new Error("Set a SESSION_SECRET of at least 32 characters.");
-  return createHmac("sha256",secret).update(payload).digest("base64url");
+  return createHmac("sha256",secret).update(value).digest("hex");
 }
 
 export function equal(a:string,b:string){
@@ -15,15 +18,9 @@ export function equal(a:string,b:string){
   return left.length===right.length&&timingSafeEqual(left,right);
 }
 
-export function sessionFor(userId:string){
-  const payload=userId+"."+Math.floor(Date.now()/1000+sessionAge);
-  return payload+"."+sign(payload);
-}
-
 export async function getUser(){
   const value=(await cookies()).get(cookieName)?.value;
-  if(!value) return null;
-  const [userId,expires,signature,...extra]=value.split(".");
-  if(extra.length||!userId||!signature||!/^\d+$/.test(expires)||Number(expires)<=Date.now()/1000) return null;
-  return equal(signature,sign(userId+"."+expires))?{userId}:null;
+  if(!value||!tokenPattern.test(value)) return null;
+  return await db().prepare("SELECT user_id AS userId FROM account_sessions WHERE digest=? AND expires>?")
+    .bind(digest(value),Date.now()).first<{userId:string}>()??null;
 }

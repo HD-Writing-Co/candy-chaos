@@ -66,3 +66,22 @@ CREATE TABLE IF NOT EXISTS club_floor (
   seen INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS club_floor_seen ON club_floor(seen);
+
+CREATE TABLE IF NOT EXISTS verified_accounts (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS signup_tokens (
+  email TEXT PRIMARY KEY,
+  digest TEXT NOT NULL UNIQUE,
+  expires INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS account_sessions (
+  digest TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  expires INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_sessions_expiry ON account_sessions(expires);
+CREATE INDEX IF NOT EXISTS signup_tokens_expiry ON signup_tokens(expires);

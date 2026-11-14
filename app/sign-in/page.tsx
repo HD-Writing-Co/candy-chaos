@@ -1,32 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { useState,type FormEvent } from "react";
+import { useEffect,useState,type FormEvent } from "react";
 import { ArrowLeft,Zap } from "lucide-react";
 
+type Mode="login"|"signup"|"sent"|"complete";
 export default function SignIn(){
-  const [register,setRegister]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  const [mode,setMode]=useState<Mode>("login"),[token,setToken]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  useEffect(()=>{
+    const value=new URLSearchParams(window.location.hash.slice(1)).get("signup");
+    if(value){
+      setToken(value);setMode("complete");
+      window.history.replaceState(null,"",window.location.pathname);
+    }
+  },[]);
+  function change(next:Mode){setMode(next);setError("");}
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
     setBusy(true);setError("");
     try{
       const values=Object.fromEntries(new FormData(event.currentTarget));
-      const response=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...values,action:register?"register":"login"})});
+      const response=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...values,action:mode,...(mode==="complete"?{token}:{})})});
       if(!response.ok) throw new Error((await response.json().catch(()=>null))?.error??"Sign-in is temporarily unavailable.");
+      if(mode==="signup"){change("sent");return;}
       window.location.assign("/");
-    }catch(e){setError(e instanceof Error?e.message:"Try again.");setBusy(false);}
+    }catch(e){setError(e instanceof Error?e.message:"Try again.");}finally{setBusy(false);}
   }
   return <main className="auth-shell"><section className="auth-card">
     <Link className="auth-back" href="/"><ArrowLeft size={16}/> Back to the club</Link>
     <span className="logo"><Zap size={22} fill="currentColor"/></span>
-    <h1>{register?"Join Chaos & Candy":"Sign in to Chaos & Candy"}</h1>
-    <form onSubmit={submit}>
-      <label>Username<input name="username" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9_\-]+" autoComplete="username"/></label>
-      <label>Password<input name="password" type="password" required minLength={12} maxLength={128} autoComplete={register?"new-password":"current-password"}/></label>
-      {register&&<label>Club invite code<input name="invite" required type="password" autoComplete="off"/></label>}
+    <h1>{mode==="login"?"Sign in to Chaos & Candy":mode==="sent"?"Check your email":mode==="complete"?"Finish creating your account":"Join Chaos & Candy"}</h1>
+    {mode==="sent"?<><p>Open the verification link to choose your username and password. Check your spam folder if the email hasn’t arrived.</p><button className="auth-switch" onClick={()=>change("signup")}>Send another link</button></>:<form key={mode} onSubmit={submit}>
+      {mode==="signup"?<><p>Enter your email to get a verification link.</p><label>Email address<input name="email" type="email" required maxLength={254} autoComplete="email"/></label></>:<>
+        <label>Username<input name="username" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9_\-]+" autoComplete="username"/></label>
+        <label>Password<input name="password" type="password" required minLength={mode==="complete"?15:12} maxLength={128} autoComplete={mode==="complete"?"new-password":"current-password"}/></label>
+        {mode==="complete"&&<p>Use at least 15 characters.</p>}
+      </>}
       {error&&<p className="error" role="alert">{error}</p>}
-      <button className="primary" disabled={busy}>{busy?"Please wait…":register?"Create account":"Sign in"}</button>
-    </form>
-    <button className="auth-switch" onClick={()=>{setRegister(!register);setError("");}} disabled={busy}>{register?"Already a member? Sign in":"Have an invite code? Create an account"}</button>
+      <button className="primary" disabled={busy}>{busy?"Please wait…":mode==="signup"?"Send verification link":mode==="complete"?"Create account":"Sign in"}</button>
+    </form>}
+    <button className="auth-switch" onClick={()=>change(mode==="login"||mode==="complete"?"signup":"login")} disabled={busy}>{mode==="login"?"New here? Create an account":mode==="complete"?"Request a new verification link":"Already a member? Sign in"}</button>
   </section></main>;
 }
